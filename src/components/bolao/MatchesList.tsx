@@ -16,6 +16,19 @@ interface Props {
   scoringScore: number
 }
 
+const STAGE_LABELS: Record<string, string> = {
+  GROUP_STAGE: 'Fase de Grupos',
+  ROUND_OF_16: 'Oitavas de Final',
+  QUARTER_FINALS: 'Quartas de Final',
+  SEMI_FINALS: 'Semifinal',
+  FINAL: 'Final',
+  THIRD_PLACE: '3º Lugar',
+}
+
+function formatStage(stage: string) {
+  return STAGE_LABELS[stage] ?? stage
+}
+
 function formatDate(dateStr: string) {
   const d = new Date(dateStr)
   return d.toLocaleDateString('pt-BR', {
@@ -131,10 +144,10 @@ export default function MatchesList({ matches, bolaoId, userId, scoringResult, s
                 >
                   <div className="flex items-center justify-between gap-4">
                     {/* Home team */}
-                    <div className="flex-1 text-right">
+                    <div className="flex-1 text-right flex items-center justify-end gap-2">
                       <span className="font-semibold text-gray-800">{match.home_team}</span>
                       {match.home_team_flag && (
-                        <span className="ml-2 text-lg">{match.home_team_flag}</span>
+                        <img src={match.home_team_flag} alt={match.home_team} className="w-6 h-6 object-contain" />
                       )}
                     </div>
 
@@ -187,9 +200,9 @@ export default function MatchesList({ matches, bolaoId, userId, scoringResult, s
                     </div>
 
                     {/* Away team */}
-                    <div className="flex-1 text-left">
+                    <div className="flex-1 text-left flex items-center gap-2">
                       {match.away_team_flag && (
-                        <span className="mr-2 text-lg">{match.away_team_flag}</span>
+                        <img src={match.away_team_flag} alt={match.away_team} className="w-6 h-6 object-contain" />
                       )}
                       <span className="font-semibold text-gray-800">{match.away_team}</span>
                     </div>
@@ -199,7 +212,7 @@ export default function MatchesList({ matches, bolaoId, userId, scoringResult, s
                     <div className="flex items-center gap-2 text-xs text-gray-400">
                       <Clock className="w-3 h-3" />
                       {formatDate(match.match_date)}
-                      <Badge variant="outline" className="text-xs">{match.stage}</Badge>
+                      <Badge variant="outline" className="text-xs">{formatStage(match.stage)}</Badge>
                       {match.status === 'LIVE' && (
                         <Badge className="bg-red-500 text-white animate-pulse">AO VIVO</Badge>
                       )}
