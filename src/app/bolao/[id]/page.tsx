@@ -18,7 +18,7 @@ interface Props {
   params: Promise<{ id: string }>
 }
 
-const TOURNAMENT_LOCK_DATE = new Date('2026-06-11T12:00:00Z')
+const TOURNAMENT_LOCK_DATE = new Date('2026-06-11T03:00:00Z') // meia-noite dia 10 (horário Brasília)
 
 async function getData(id: string) {
   if (IS_DEV_MODE) {
