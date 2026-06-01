@@ -75,8 +75,8 @@ export async function POST(request: Request) {
 
   const upsertData = matches.map((m) => ({
     external_id: m.id,
-    home_team: m.homeTeam.shortName || m.homeTeam.name,
-    away_team: m.awayTeam.shortName || m.awayTeam.name,
+    home_team: m.homeTeam.shortName || m.homeTeam.name || 'A definir',
+    away_team: m.awayTeam.shortName || m.awayTeam.name || 'A definir',
     home_team_flag: flagEmoji(m.homeTeam.crest),
     away_team_flag: flagEmoji(m.awayTeam.crest),
     match_date: m.utcDate,
