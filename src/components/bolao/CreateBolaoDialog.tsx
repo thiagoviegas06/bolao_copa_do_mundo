@@ -11,6 +11,8 @@ import { Plus, X, HelpCircle } from 'lucide-react'
 type ScoringForm = {
   scoring_correct_result: number
   scoring_correct_score: number
+  scoring_draw: number
+  scoring_correct_diff: number
   scoring_knockout: number
   scoring_champion: number
   scoring_top_scorer: number
@@ -19,6 +21,8 @@ type ScoringForm = {
 const DEFAULTS: ScoringForm = {
   scoring_correct_result: 1,
   scoring_correct_score: 3,
+  scoring_draw: 2,
+  scoring_correct_diff: 2,
   scoring_knockout: 5,
   scoring_champion: 15,
   scoring_top_scorer: 10,
@@ -181,16 +185,28 @@ export default function CreateBolaoDialog({ userId }: { userId: string }) {
             {tab === 'jogos' && (
               <div className="divide-y">
                 <ScoreField
-                  label="Resultado certo"
-                  hint="Acertar quem ganhou/empatou (ex: Brasil ganhou)"
-                  value={scoring.scoring_correct_result}
-                  onChange={setScore('scoring_correct_result')}
-                />
-                <ScoreField
-                  label="Placar exato"
+                  label="Placar exato (cravada)"
                   hint="Acertar o placar exato do jogo (ex: 2×1)"
                   value={scoring.scoring_correct_score}
                   onChange={setScore('scoring_correct_score')}
+                />
+                <ScoreField
+                  label="Empate certo"
+                  hint="Resultado é empate e apostou empate (qualquer placar de empate)"
+                  value={scoring.scoring_draw}
+                  onChange={setScore('scoring_draw')}
+                />
+                <ScoreField
+                  label="Vitória + saldo"
+                  hint="Acertou quem ganhou e a diferença de gols (ex: ganhou por 1)"
+                  value={scoring.scoring_correct_diff}
+                  onChange={setScore('scoring_correct_diff')}
+                />
+                <ScoreField
+                  label="Resultado certo"
+                  hint="Só acertou quem ganhou, sem acertar o saldo"
+                  value={scoring.scoring_correct_result}
+                  onChange={setScore('scoring_correct_result')}
                 />
               </div>
             )}

@@ -36,8 +36,9 @@ export type Database = {
           owner_id: string
           scoring_correct_result: number
           scoring_correct_score: number
+          scoring_draw: number
+          scoring_correct_diff: number
           scoring_knockout: number
-          // Pre-tournament predictions
           scoring_champion: number
           scoring_top_scorer: number
           created_at: string
@@ -50,6 +51,8 @@ export type Database = {
           owner_id: string
           scoring_correct_result?: number
           scoring_correct_score?: number
+          scoring_draw?: number
+          scoring_correct_diff?: number
           scoring_knockout?: number
           scoring_champion?: number
           scoring_top_scorer?: number
@@ -63,6 +66,8 @@ export type Database = {
           owner_id?: string
           scoring_correct_result?: number
           scoring_correct_score?: number
+          scoring_draw?: number
+          scoring_correct_diff?: number
           scoring_knockout?: number
           scoring_champion?: number
           scoring_top_scorer?: number

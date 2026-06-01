@@ -25,6 +25,8 @@ create table public.boloes (
   owner_id uuid references public.profiles(id) on delete cascade not null,
   scoring_correct_result integer default 1 not null,
   scoring_correct_score integer default 3 not null,
+  scoring_draw integer default 2 not null,
+  scoring_correct_diff integer default 2 not null,
   scoring_knockout integer default 5 not null,
   scoring_champion integer default 15 not null,
   scoring_top_scorer integer default 10 not null,
@@ -200,7 +202,9 @@ create or replace function public.calculate_points(
   real_home integer,
   real_away integer,
   pts_result integer,
-  pts_score integer
+  pts_score integer,
+  pts_draw integer,
+  pts_diff integer
 ) returns integer as $$
 declare
   pred_result text;
@@ -210,6 +214,7 @@ begin
     return null;
   end if;
 
+  -- Cravada (placar exato)
   if pred_home = real_home and pred_away = real_away then
     return pts_score;
   end if;
@@ -224,7 +229,16 @@ begin
   else real_result := 'D';
   end if;
 
-  if pred_result = real_result then
+  -- Empate acertado
+  if real_result = 'D' and pred_result = 'D' then
+    return pts_draw;
+  end if;
+
+  -- Vitória: checa saldo e depois resultado
+  if real_result != 'D' and pred_result = real_result then
+    if abs(pred_home - pred_away) = abs(real_home - real_away) then
+      return pts_diff;
+    end if;
     return pts_result;
   end if;
 
@@ -242,7 +256,9 @@ begin
       p.home_score, p.away_score,
       new.home_score, new.away_score,
       b.scoring_correct_result,
-      b.scoring_correct_score
+      b.scoring_correct_score,
+      b.scoring_draw,
+      b.scoring_correct_diff
     )
     from public.boloes b
     where p.match_id = new.id and p.bolao_id = b.id;
