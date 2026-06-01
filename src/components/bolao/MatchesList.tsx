@@ -52,12 +52,15 @@ function groupByDate(matches: MatchWithPrediction[]) {
   return groups
 }
 
-function earliestByDate(matches: MatchWithPrediction[]): Record<string, Date> {
+function lockTimeByDate(matches: MatchWithPrediction[]): Record<string, Date> {
   const map: Record<string, Date> = {}
   matches.forEach((m) => {
     const key = dateKey(m.match_date)
-    const d = new Date(m.match_date)
-    if (!map[key] || d < map[key]) map[key] = d
+    if (!map[key]) {
+      const midnight = new Date(m.match_date)
+      midnight.setHours(0, 0, 0, 0) // meia-noite no horário local do browser
+      map[key] = midnight
+    }
   })
   return map
 }
@@ -78,7 +81,7 @@ export default function MatchesList({ matches, bolaoId, userId, scoringResult, s
   const [saved, setSaved] = useState<Record<string, boolean>>({})
 
   const grouped = groupByDate(matches)
-  const lockByDate = earliestByDate(matches)
+  const lockByDate = lockTimeByDate(matches)
   const now = new Date()
 
   async function savePrediction(matchId: string) {
