@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Prediction, Match, RankingEntry } from '@/types/database'
+import { Prediction, Match, RankingEntry, TournamentPrediction } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
-import { Clock, Trophy } from 'lucide-react'
+import { Clock, Trophy, Zap } from 'lucide-react'
 
 interface Props {
   allPredictions: Prediction[]
+  allTournamentPredictions: TournamentPrediction[]
   matches: Match[]
   ranking: RankingEntry[]
   currentUserId: string
@@ -37,7 +38,7 @@ function groupByDate(matches: Match[]) {
   return groups
 }
 
-export default function AllPredictions({ allPredictions, matches, ranking, currentUserId }: Props) {
+export default function AllPredictions({ allPredictions, allTournamentPredictions, matches, ranking, currentUserId }: Props) {
   const [selectedUserId, setSelectedUserId] = useState(currentUserId)
 
   const grouped = groupByDate(matches)
@@ -46,6 +47,7 @@ export default function AllPredictions({ allPredictions, matches, ranking, curre
       .filter((p) => p.user_id === selectedUserId)
       .map((p) => [p.match_id, p])
   )
+  const tournamentPred = allTournamentPredictions.find((t) => t.user_id === selectedUserId) ?? null
 
   const selectedUser = ranking.find((r) => r.user_id === selectedUserId)
   const predictedCount = allPredictions.filter((p) => p.user_id === selectedUserId).length
@@ -94,6 +96,38 @@ export default function AllPredictions({ allPredictions, matches, ranking, curre
           <span className="font-bold text-green-700">{selectedUser.total_points} pts</span>
         </div>
       )}
+
+      {/* Tournament prediction card */}
+      <div className="bg-white rounded-xl border p-4">
+        <h4 className="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-2">
+          <Trophy className="w-4 h-4 text-yellow-500" />
+          Palpites de Torneio
+        </h4>
+        {tournamentPred ? (
+          <div className="flex flex-wrap gap-6">
+            <div>
+              <p className="text-xs text-gray-400 mb-0.5">Campeão</p>
+              <p className="text-sm font-medium text-gray-800">{tournamentPred.champion ?? <span className="text-gray-300 italic">não preenchido</span>}</p>
+              {tournamentPred.champion_points !== null && (
+                <Badge className={tournamentPred.champion_points > 0 ? 'bg-green-600 text-white mt-1' : 'bg-gray-100 text-gray-500 mt-1'}>
+                  {tournamentPred.champion_points > 0 ? `+${tournamentPred.champion_points}` : '0'} pts
+                </Badge>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-0.5 flex items-center gap-1"><Zap className="w-3 h-3 text-orange-400" />Artilheiro</p>
+              <p className="text-sm font-medium text-gray-800">{tournamentPred.top_scorer ?? <span className="text-gray-300 italic">não preenchido</span>}</p>
+              {tournamentPred.top_scorer_points !== null && (
+                <Badge className={tournamentPred.top_scorer_points > 0 ? 'bg-green-600 text-white mt-1' : 'bg-gray-100 text-gray-500 mt-1'}>
+                  {tournamentPred.top_scorer_points > 0 ? `+${tournamentPred.top_scorer_points}` : '0'} pts
+                </Badge>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 italic">Sem palpites de torneio.</p>
+        )}
+      </div>
 
       {/* Legend */}
       <div className="flex items-center gap-4 text-xs text-gray-400">

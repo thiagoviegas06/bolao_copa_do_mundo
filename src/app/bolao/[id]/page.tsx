@@ -32,8 +32,9 @@ async function getData(id: string) {
       bolao,
       matchesWithPredictions: MOCK_MATCHES.map((m) => ({ ...m, prediction: predMap.get(m.id) ?? null })),
       allPredictions: MOCK_PREDICTIONS.filter((p) => p.bolao_id === bolao.id) as Prediction[],
-      ranking: MOCK_RANKING as RankingEntry[],
+      allTournamentPredictions: MOCK_TOURNAMENT_PREDICTION ? [MOCK_TOURNAMENT_PREDICTION] : [],
       tournamentPrediction: MOCK_TOURNAMENT_PREDICTION,
+      ranking: MOCK_RANKING as RankingEntry[],
     }
   }
 
@@ -52,12 +53,12 @@ async function getData(id: string) {
     { data: matches },
     { data: allPredictions },
     { data: rankingMembers },
-    { data: tournamentPrediction },
+    { data: allTournamentPredictions },
   ] = await Promise.all([
     supabase.from('matches').select('*').order('match_date', { ascending: true }),
     supabase.from('predictions').select('*').eq('bolao_id', id),
     supabase.from('bolao_members').select('user_id, total_points').eq('bolao_id', id).order('total_points', { ascending: false }),
-    supabase.from('tournament_predictions').select('*').eq('bolao_id', id).eq('user_id', user.id).maybeSingle(),
+    supabase.from('tournament_predictions').select('*').eq('bolao_id', id),
   ])
 
   const memberUserIds = (rankingMembers ?? []).map((m) => m.user_id)
@@ -74,6 +75,8 @@ async function getData(id: string) {
     bolao,
     matchesWithPredictions: (matches ?? []).map((m) => ({ ...m, prediction: predMap.get(m.id) ?? null })),
     allPredictions: (allPredictions ?? []) as Prediction[],
+    allTournamentPredictions: (allTournamentPredictions ?? []),
+    tournamentPrediction: (allTournamentPredictions ?? []).find((t) => t.user_id === user.id) ?? null,
     ranking: (rankingMembers ?? []).map((r, idx) => {
       const profile = profileMap[r.user_id]
       return {
@@ -84,7 +87,6 @@ async function getData(id: string) {
         rank: idx + 1,
       }
     }) as RankingEntry[],
-    tournamentPrediction: tournamentPrediction ?? null,
   }
 }
 
@@ -96,7 +98,7 @@ export default async function BolaoPage({ params }: Props) {
   if (data === 'not_found') notFound()
   if (data === 'not_member') redirect('/dashboard')
 
-  const { user, bolao, matchesWithPredictions, allPredictions, ranking, tournamentPrediction } = data
+  const { user, bolao, matchesWithPredictions, allPredictions, allTournamentPredictions, ranking, tournamentPrediction } = data
   const now = new Date()
   const tournamentLocked = now >= TOURNAMENT_LOCK_DATE
   const isOwner = bolao.owner_id === user.id
@@ -155,6 +157,7 @@ export default async function BolaoPage({ params }: Props) {
           <TabsContent value="palpites">
             <AllPredictions
               allPredictions={allPredictions}
+              allTournamentPredictions={allTournamentPredictions}
               matches={matchesWithPredictions}
               ranking={ranking}
               currentUserId={user.id}
