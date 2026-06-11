@@ -9,11 +9,12 @@ import RankingTable from '@/components/bolao/RankingTable'
 import TournamentPredictions from '@/components/bolao/TournamentPredictions'
 import CopyInviteButton from '@/components/bolao/CopyInviteButton'
 import AdminPanel from '@/components/bolao/AdminPanel'
+import AllPredictions from '@/components/bolao/AllPredictions'
 import {
   IS_DEV_MODE, MOCK_USER, MOCK_BOLOES, MOCK_MATCHES,
   MOCK_PREDICTIONS, MOCK_RANKING, MOCK_TOURNAMENT_PREDICTION,
 } from '@/lib/dev-data'
-import { RankingEntry } from '@/types/database'
+import { RankingEntry, Prediction } from '@/types/database'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -24,11 +25,13 @@ const TOURNAMENT_LOCK_DATE = new Date('2026-06-11T03:00:00Z') // meia-noite dia 
 async function getData(id: string) {
   if (IS_DEV_MODE) {
     const bolao = MOCK_BOLOES.find((b) => b.id === id) ?? MOCK_BOLOES[0]
-    const predMap = new Map(MOCK_PREDICTIONS.filter((p) => p.bolao_id === bolao.id).map((p) => [p.match_id, p]))
+    const myPreds = MOCK_PREDICTIONS.filter((p) => p.bolao_id === bolao.id && p.user_id === MOCK_USER.id)
+    const predMap = new Map(myPreds.map((p) => [p.match_id, p]))
     return {
       user: MOCK_USER,
       bolao,
       matchesWithPredictions: MOCK_MATCHES.map((m) => ({ ...m, prediction: predMap.get(m.id) ?? null })),
+      allPredictions: MOCK_PREDICTIONS.filter((p) => p.bolao_id === bolao.id) as Prediction[],
       ranking: MOCK_RANKING as RankingEntry[],
       tournamentPrediction: MOCK_TOURNAMENT_PREDICTION,
     }
@@ -47,12 +50,12 @@ async function getData(id: string) {
 
   const [
     { data: matches },
-    { data: myPredictions },
+    { data: allPredictions },
     { data: rankingMembers },
     { data: tournamentPrediction },
   ] = await Promise.all([
     supabase.from('matches').select('*').order('match_date', { ascending: true }),
-    supabase.from('predictions').select('*').eq('bolao_id', id).eq('user_id', user.id),
+    supabase.from('predictions').select('*').eq('bolao_id', id),
     supabase.from('bolao_members').select('user_id, total_points').eq('bolao_id', id).order('total_points', { ascending: false }),
     supabase.from('tournament_predictions').select('*').eq('bolao_id', id).eq('user_id', user.id).maybeSingle(),
   ])
@@ -63,12 +66,14 @@ async function getData(id: string) {
     : { data: [] }
 
   const profileMap = Object.fromEntries((memberProfiles ?? []).map((p) => [p.id, p]))
-  const predMap = new Map((myPredictions ?? []).map((p) => [p.match_id, p]))
+  const myPreds = (allPredictions ?? []).filter((p) => p.user_id === user.id)
+  const predMap = new Map(myPreds.map((p) => [p.match_id, p]))
 
   return {
     user,
     bolao,
     matchesWithPredictions: (matches ?? []).map((m) => ({ ...m, prediction: predMap.get(m.id) ?? null })),
+    allPredictions: (allPredictions ?? []) as Prediction[],
     ranking: (rankingMembers ?? []).map((r, idx) => {
       const profile = profileMap[r.user_id]
       return {
@@ -91,7 +96,7 @@ export default async function BolaoPage({ params }: Props) {
   if (data === 'not_found') notFound()
   if (data === 'not_member') redirect('/dashboard')
 
-  const { user, bolao, matchesWithPredictions, ranking, tournamentPrediction } = data
+  const { user, bolao, matchesWithPredictions, allPredictions, ranking, tournamentPrediction } = data
   const now = new Date()
   const tournamentLocked = now >= TOURNAMENT_LOCK_DATE
   const isOwner = bolao.owner_id === user.id
@@ -123,6 +128,7 @@ export default async function BolaoPage({ params }: Props) {
           <TabsList className="mb-6 flex w-full">
             <TabsTrigger value="torneio" className="flex-1">Torneio</TabsTrigger>
             <TabsTrigger value="jogos" className="flex-1">Jogos</TabsTrigger>
+            <TabsTrigger value="palpites" className="flex-1">Palpites</TabsTrigger>
             <TabsTrigger value="ranking" className="flex-1">Ranking</TabsTrigger>
             {isOwner && <TabsTrigger value="admin" className="flex-1">Admin</TabsTrigger>}
           </TabsList>
@@ -143,6 +149,15 @@ export default async function BolaoPage({ params }: Props) {
               userId={user.id}
               scoringResult={bolao.scoring_correct_result}
               scoringScore={bolao.scoring_correct_score}
+            />
+          </TabsContent>
+
+          <TabsContent value="palpites">
+            <AllPredictions
+              allPredictions={allPredictions}
+              matches={matchesWithPredictions}
+              ranking={ranking}
+              currentUserId={user.id}
             />
           </TabsContent>
 
