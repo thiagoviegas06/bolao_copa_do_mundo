@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Match, RankingEntry, Prediction } from '@/types/database'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -84,15 +83,10 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
     if (!userId) return
 
     setLoadingPreds(true)
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('predictions')
-      .select('*')
-      .eq('bolao_id', bolaoId)
-      .eq('user_id', userId)
+    const res = await fetch(`/api/admin/predictions?bolaoId=${bolaoId}&userId=${userId}`)
     setLoadingPreds(false)
 
-    const preds = data ?? []
+    const preds: Prediction[] = res.ok ? await res.json() : []
     setUserPredictions(preds)
     setPredEdits(Object.fromEntries(preds.map((p) => [p.id, {
       home: p.home_score.toString(),
