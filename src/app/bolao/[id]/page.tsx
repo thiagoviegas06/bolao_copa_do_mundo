@@ -8,6 +8,7 @@ import MatchesList from '@/components/bolao/MatchesList'
 import RankingTable from '@/components/bolao/RankingTable'
 import TournamentPredictions from '@/components/bolao/TournamentPredictions'
 import CopyInviteButton from '@/components/bolao/CopyInviteButton'
+import AdminPanel from '@/components/bolao/AdminPanel'
 import {
   IS_DEV_MODE, MOCK_USER, MOCK_BOLOES, MOCK_MATCHES,
   MOCK_PREDICTIONS, MOCK_RANKING, MOCK_TOURNAMENT_PREDICTION,
@@ -93,6 +94,7 @@ export default async function BolaoPage({ params }: Props) {
   const { user, bolao, matchesWithPredictions, ranking, tournamentPrediction } = data
   const now = new Date()
   const tournamentLocked = now >= TOURNAMENT_LOCK_DATE
+  const isOwner = bolao.owner_id === user.id
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -122,6 +124,7 @@ export default async function BolaoPage({ params }: Props) {
             <TabsTrigger value="torneio" className="flex-1">Torneio</TabsTrigger>
             <TabsTrigger value="jogos" className="flex-1">Jogos</TabsTrigger>
             <TabsTrigger value="ranking" className="flex-1">Ranking</TabsTrigger>
+            {isOwner && <TabsTrigger value="admin" className="flex-1">Admin</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="torneio">
@@ -146,6 +149,16 @@ export default async function BolaoPage({ params }: Props) {
           <TabsContent value="ranking">
             <RankingTable ranking={ranking} currentUserId={user.id} />
           </TabsContent>
+
+          {isOwner && (
+            <TabsContent value="admin">
+              <AdminPanel
+                matches={matchesWithPredictions}
+                ranking={ranking}
+                bolaoId={bolao.id}
+              />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>
