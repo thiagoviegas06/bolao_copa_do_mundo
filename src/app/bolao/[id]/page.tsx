@@ -172,6 +172,7 @@ export default async function BolaoPage({ params }: Props) {
               matches={matchesWithPredictions}
               ranking={ranking}
               currentUserId={user.id}
+              tournamentLocked={tournamentLocked}
             />
           </TabsContent>
 

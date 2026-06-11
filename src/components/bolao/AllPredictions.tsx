@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Prediction, Match, RankingEntry, TournamentPrediction } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
-import { Clock, Trophy, Zap } from 'lucide-react'
+import { Clock, Trophy, Zap, Lock } from 'lucide-react'
 
 interface Props {
   allPredictions: Prediction[]
@@ -11,6 +11,7 @@ interface Props {
   matches: Match[]
   ranking: RankingEntry[]
   currentUserId: string
+  tournamentLocked: boolean
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -20,6 +21,10 @@ const STAGE_LABELS: Record<string, string> = {
   SEMI_FINALS: 'Semifinal',
   FINAL: 'Final',
   THIRD_PLACE: '3º Lugar',
+}
+
+function matchLockTime(match_date: string): Date {
+  return new Date(new Date(match_date).getTime() - 5 * 60 * 1000)
 }
 
 function dateKey(match_date: string) {
@@ -38,8 +43,13 @@ function groupByDate(matches: Match[]) {
   return groups
 }
 
-export default function AllPredictions({ allPredictions, allTournamentPredictions, matches, ranking, currentUserId }: Props) {
+export default function AllPredictions({
+  allPredictions, allTournamentPredictions, matches, ranking, currentUserId, tournamentLocked,
+}: Props) {
   const [selectedUserId, setSelectedUserId] = useState(currentUserId)
+
+  const now = new Date()
+  const isOwnProfile = selectedUserId === currentUserId
 
   const grouped = groupByDate(matches)
   const predMap = new Map(
@@ -48,6 +58,7 @@ export default function AllPredictions({ allPredictions, allTournamentPrediction
       .map((p) => [p.match_id, p])
   )
   const tournamentPred = allTournamentPredictions.find((t) => t.user_id === selectedUserId) ?? null
+  const canSeeTournament = isOwnProfile || tournamentLocked
 
   const selectedUser = ranking.find((r) => r.user_id === selectedUserId)
   const predictedCount = allPredictions.filter((p) => p.user_id === selectedUserId).length
@@ -103,11 +114,18 @@ export default function AllPredictions({ allPredictions, allTournamentPrediction
           <Trophy className="w-4 h-4 text-yellow-500" />
           Palpites de Torneio
         </h4>
-        {tournamentPred ? (
+        {!canSeeTournament ? (
+          <div className="flex items-center gap-2 text-sm text-gray-400 italic">
+            <Lock className="w-3.5 h-3.5" />
+            Visível após o prazo de palpites de torneio encerrar.
+          </div>
+        ) : tournamentPred ? (
           <div className="flex flex-wrap gap-6">
             <div>
               <p className="text-xs text-gray-400 mb-0.5">Campeão</p>
-              <p className="text-sm font-medium text-gray-800">{tournamentPred.champion ?? <span className="text-gray-300 italic">não preenchido</span>}</p>
+              <p className="text-sm font-medium text-gray-800">
+                {tournamentPred.champion ?? <span className="text-gray-300 italic">não preenchido</span>}
+              </p>
               {tournamentPred.champion_points !== null && (
                 <Badge className={tournamentPred.champion_points > 0 ? 'bg-green-600 text-white mt-1' : 'bg-gray-100 text-gray-500 mt-1'}>
                   {tournamentPred.champion_points > 0 ? `+${tournamentPred.champion_points}` : '0'} pts
@@ -115,8 +133,12 @@ export default function AllPredictions({ allPredictions, allTournamentPrediction
               )}
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-0.5 flex items-center gap-1"><Zap className="w-3 h-3 text-orange-400" />Artilheiro</p>
-              <p className="text-sm font-medium text-gray-800">{tournamentPred.top_scorer ?? <span className="text-gray-300 italic">não preenchido</span>}</p>
+              <p className="text-xs text-gray-400 mb-0.5 flex items-center gap-1">
+                <Zap className="w-3 h-3 text-orange-400" />Artilheiro
+              </p>
+              <p className="text-sm font-medium text-gray-800">
+                {tournamentPred.top_scorer ?? <span className="text-gray-300 italic">não preenchido</span>}
+              </p>
               {tournamentPred.top_scorer_points !== null && (
                 <Badge className={tournamentPred.top_scorer_points > 0 ? 'bg-green-600 text-white mt-1' : 'bg-gray-100 text-gray-500 mt-1'}>
                   {tournamentPred.top_scorer_points > 0 ? `+${tournamentPred.top_scorer_points}` : '0'} pts
@@ -129,16 +151,6 @@ export default function AllPredictions({ allPredictions, allTournamentPrediction
         )}
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-gray-400">
-        <span className="flex items-center gap-1">
-          <span className="font-bold text-gray-600">Palpite</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="text-gray-400">resultado real</span>
-        </span>
-      </div>
-
       {/* Matches by day */}
       <div className="space-y-8">
         {Object.entries(grouped).map(([date, dayMatches]) => (
@@ -149,10 +161,12 @@ export default function AllPredictions({ allPredictions, allTournamentPrediction
             <div className="space-y-2">
               {dayMatches.map((match) => {
                 const pred = predMap.get(match.id)
+                const locked = matchLockTime(match.match_date) <= now
+                const canSeePred = isOwnProfile || locked
                 const hasResult = match.status === 'FINISHED' && match.home_score !== null
 
                 let pointsBadge = null
-                if (hasResult && pred) {
+                if (hasResult && pred && canSeePred) {
                   const pts = pred.points
                   if (pts === null || pts === undefined) pointsBadge = null
                   else if (pts === 0) pointsBadge = <Badge variant="secondary" className="text-xs shrink-0">0 pts</Badge>
@@ -160,10 +174,7 @@ export default function AllPredictions({ allPredictions, allTournamentPrediction
                 }
 
                 return (
-                  <div
-                    key={match.id}
-                    className={`bg-white rounded-xl border p-3 ${!pred ? 'opacity-60' : ''}`}
-                  >
+                  <div key={match.id} className="bg-white rounded-xl border p-3">
                     <div className="flex items-center gap-2">
                       {/* Home */}
                       <div className="flex-1 flex items-center justify-end gap-1.5 min-w-0">
@@ -175,7 +186,12 @@ export default function AllPredictions({ allPredictions, allTournamentPrediction
 
                       {/* Scores column */}
                       <div className="flex flex-col items-center w-24 shrink-0">
-                        {pred ? (
+                        {!canSeePred ? (
+                          <div className="flex items-center gap-1 text-xs text-gray-300">
+                            <Lock className="w-3 h-3" />
+                            <span>? : ?</span>
+                          </div>
+                        ) : pred ? (
                           <div className="flex items-center gap-1 text-sm font-bold text-gray-800">
                             <span className="w-6 text-center">{pred.home_score}</span>
                             <span className="text-gray-400">:</span>
