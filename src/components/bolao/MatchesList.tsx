@@ -52,19 +52,8 @@ function groupByDate(matches: MatchWithPrediction[]) {
   return groups
 }
 
-function lockTimeByDate(matches: MatchWithPrediction[]): Record<string, Date> {
-  const map: Record<string, Date> = {}
-  matches.forEach((m) => {
-    const key = dateKey(m.match_date)
-    const matchTime = new Date(m.match_date)
-    if (!map[key] || matchTime < map[key]) {
-      map[key] = matchTime
-    }
-  })
-  Object.keys(map).forEach((key) => {
-    map[key] = new Date(map[key].getTime() - 5 * 60 * 1000)
-  })
-  return map
+function matchLockTime(match_date: string): Date {
+  return new Date(new Date(match_date).getTime() - 5 * 60 * 1000)
 }
 
 export default function MatchesList({ matches, bolaoId, userId, scoringResult, scoringScore }: Props) {
@@ -83,7 +72,6 @@ export default function MatchesList({ matches, bolaoId, userId, scoringResult, s
   const [saved, setSaved] = useState<Record<string, boolean>>({})
 
   const grouped = groupByDate(matches)
-  const lockByDate = lockTimeByDate(matches)
   const now = new Date()
 
   async function savePrediction(matchId: string) {
@@ -123,21 +111,19 @@ export default function MatchesList({ matches, bolaoId, userId, scoringResult, s
   return (
     <div className="space-y-8">
       {Object.entries(grouped).map(([date, dayMatches]) => {
-        const isLocked = lockByDate[date] <= now
+        const allLocked = dayMatches.every((m) => matchLockTime(m.match_date) <= now)
         return (
         <div key={date}>
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 capitalize flex items-center gap-2">
             {date}
-            {isLocked ? (
+            {allLocked && (
               <span className="text-red-400 normal-case font-normal text-xs">(palpites encerrados)</span>
-            ) : (
-              <span className="text-gray-400 normal-case font-normal text-xs">
-                — palpites até {lockByDate[date].toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-              </span>
             )}
           </h3>
           <div className="space-y-3">
             {dayMatches.map((match) => {
+              const lockTime = matchLockTime(match.match_date)
+              const isLocked = lockTime <= now
               const pred = predictions[match.id]
               const hasResult = match.status === 'FINISHED' && match.home_score !== null
 
@@ -227,6 +213,11 @@ export default function MatchesList({ matches, bolaoId, userId, scoringResult, s
                       <Badge variant="outline" className="text-xs">{formatStage(match.stage)}</Badge>
                       {match.status === 'LIVE' && (
                         <Badge className="bg-red-500 text-white animate-pulse">AO VIVO</Badge>
+                      )}
+                      {!isLocked && (
+                        <span className="text-gray-400">
+                          · palpites até {lockTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
