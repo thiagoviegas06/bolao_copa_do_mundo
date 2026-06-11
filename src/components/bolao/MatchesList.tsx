@@ -56,11 +56,13 @@ function lockTimeByDate(matches: MatchWithPrediction[]): Record<string, Date> {
   const map: Record<string, Date> = {}
   matches.forEach((m) => {
     const key = dateKey(m.match_date)
-    if (!map[key]) {
-      const midnight = new Date(m.match_date)
-      midnight.setHours(0, 0, 0, 0) // meia-noite no horário local do browser
-      map[key] = midnight
+    const matchTime = new Date(m.match_date)
+    if (!map[key] || matchTime < map[key]) {
+      map[key] = matchTime
     }
+  })
+  Object.keys(map).forEach((key) => {
+    map[key] = new Date(map[key].getTime() - 5 * 60 * 1000)
   })
   return map
 }
@@ -124,8 +126,15 @@ export default function MatchesList({ matches, bolaoId, userId, scoringResult, s
         const isLocked = lockByDate[date] <= now
         return (
         <div key={date}>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 capitalize">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 capitalize flex items-center gap-2">
             {date}
+            {isLocked ? (
+              <span className="text-red-400 normal-case font-normal text-xs">(palpites encerrados)</span>
+            ) : (
+              <span className="text-gray-400 normal-case font-normal text-xs">
+                — palpites até {lockByDate[date].toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </h3>
           <div className="space-y-3">
             {dayMatches.map((match) => {
