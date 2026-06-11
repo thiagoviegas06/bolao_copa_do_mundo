@@ -10,11 +10,12 @@ import TournamentPredictions from '@/components/bolao/TournamentPredictions'
 import CopyInviteButton from '@/components/bolao/CopyInviteButton'
 import AdminPanel from '@/components/bolao/AdminPanel'
 import AllPredictions from '@/components/bolao/AllPredictions'
+import GroupWinnerPredictions from '@/components/bolao/GroupWinnerPredictions'
 import {
   IS_DEV_MODE, MOCK_USER, MOCK_BOLOES, MOCK_MATCHES,
   MOCK_PREDICTIONS, MOCK_RANKING, MOCK_TOURNAMENT_PREDICTION,
 } from '@/lib/dev-data'
-import { RankingEntry, Prediction } from '@/types/database'
+import { RankingEntry, Prediction, GroupPrediction } from '@/types/database'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -34,6 +35,7 @@ async function getData(id: string) {
       allPredictions: MOCK_PREDICTIONS.filter((p) => p.bolao_id === bolao.id) as Prediction[],
       allTournamentPredictions: MOCK_TOURNAMENT_PREDICTION ? [MOCK_TOURNAMENT_PREDICTION] : [],
       tournamentPrediction: MOCK_TOURNAMENT_PREDICTION,
+      groupPredictions: [] as GroupPrediction[],
       ranking: MOCK_RANKING as RankingEntry[],
     }
   }
@@ -54,11 +56,13 @@ async function getData(id: string) {
     { data: allPredictions },
     { data: rankingMembers },
     { data: allTournamentPredictions },
+    { data: groupPredictions },
   ] = await Promise.all([
     supabase.from('matches').select('*').order('match_date', { ascending: true }),
     supabase.from('predictions').select('*').eq('bolao_id', id),
     supabase.from('bolao_members').select('user_id, total_points').eq('bolao_id', id).order('total_points', { ascending: false }),
     supabase.from('tournament_predictions').select('*').eq('bolao_id', id),
+    supabase.from('group_predictions').select('*').eq('bolao_id', id).eq('user_id', user.id),
   ])
 
   const memberUserIds = (rankingMembers ?? []).map((m) => m.user_id)
@@ -77,6 +81,7 @@ async function getData(id: string) {
     allPredictions: (allPredictions ?? []) as Prediction[],
     allTournamentPredictions: (allTournamentPredictions ?? []),
     tournamentPrediction: (allTournamentPredictions ?? []).find((t) => t.user_id === user.id) ?? null,
+    groupPredictions: (groupPredictions ?? []) as GroupPrediction[],
     ranking: (rankingMembers ?? []).map((r, idx) => {
       const profile = profileMap[r.user_id]
       return {
@@ -98,7 +103,7 @@ export default async function BolaoPage({ params }: Props) {
   if (data === 'not_found') notFound()
   if (data === 'not_member') redirect('/dashboard')
 
-  const { user, bolao, matchesWithPredictions, allPredictions, allTournamentPredictions, ranking, tournamentPrediction } = data
+  const { user, bolao, matchesWithPredictions, allPredictions, allTournamentPredictions, groupPredictions, ranking, tournamentPrediction } = data
   const now = new Date()
   const tournamentLocked = now >= TOURNAMENT_LOCK_DATE
   const isOwner = bolao.owner_id === user.id
@@ -140,6 +145,12 @@ export default async function BolaoPage({ params }: Props) {
               bolao={bolao}
               userId={user.id}
               existing={tournamentPrediction}
+              locked={tournamentLocked}
+            />
+            <GroupWinnerPredictions
+              bolaoId={bolao.id}
+              userId={user.id}
+              existingPredictions={groupPredictions}
               locked={tournamentLocked}
             />
           </TabsContent>
