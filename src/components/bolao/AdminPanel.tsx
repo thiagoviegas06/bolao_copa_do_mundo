@@ -40,7 +40,7 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
   const [matchError, setMatchError] = useState<Record<string, string>>({})
 
   const [selectedUserId, setSelectedUserId] = useState('')
-  const [userPredictions, setUserPredictions] = useState<Prediction[]>([])
+  const [predByMatch, setPredByMatch] = useState<Record<string, Prediction>>({})
   const [loadingPreds, setLoadingPreds] = useState(false)
   const [predEdits, setPredEdits] = useState<Record<string, PredEdit>>({})
   const [predSaving, setPredSaving] = useState<Record<string, boolean>>({})
@@ -78,7 +78,7 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
 
   async function loadUserPredictions(userId: string) {
     setSelectedUserId(userId)
-    setUserPredictions([])
+    setPredByMatch({})
     setPredEdits({})
     if (!userId) return
 
@@ -87,40 +87,50 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
     setLoadingPreds(false)
 
     const preds: Prediction[] = res.ok ? await res.json() : []
-    setUserPredictions(preds)
-    setPredEdits(Object.fromEntries(preds.map((p) => [p.id, {
-      home: p.home_score.toString(),
-      away: p.away_score.toString(),
-    }])))
+    const byMatch = Object.fromEntries(preds.map((p) => [p.match_id, p]))
+    setPredByMatch(byMatch)
+    setPredEdits(
+      Object.fromEntries(matches.map((m) => [m.id, {
+        home: byMatch[m.id]?.home_score?.toString() ?? '',
+        away: byMatch[m.id]?.away_score?.toString() ?? '',
+      }]))
+    )
   }
 
-  async function savePrediction(predId: string) {
-    const edit = predEdits[predId]
-    setPredSaving((s) => ({ ...s, [predId]: true }))
-    setPredError((e) => ({ ...e, [predId]: '' }))
+  async function savePrediction(matchId: string) {
+    const edit = predEdits[matchId]
+    setPredSaving((s) => ({ ...s, [matchId]: true }))
+    setPredError((e) => ({ ...e, [matchId]: '' }))
 
     const res = await fetch('/api/admin/prediction', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        predictionId: predId,
+        userId: selectedUserId,
+        matchId,
         bolaoId,
         homeScore: parseInt(edit.home),
         awayScore: parseInt(edit.away),
       }),
     })
 
-    setPredSaving((s) => ({ ...s, [predId]: false }))
+    setPredSaving((s) => ({ ...s, [matchId]: false }))
     if (res.ok) {
       const { points } = await res.json()
-      setUserPredictions((prev) =>
-        prev.map((p) => p.id === predId ? { ...p, home_score: parseInt(edit.home), away_score: parseInt(edit.away), points } : p)
-      )
-      setPredSaved((s) => ({ ...s, [predId]: true }))
-      setTimeout(() => setPredSaved((s) => ({ ...s, [predId]: false })), 2000)
+      setPredByMatch((prev) => ({
+        ...prev,
+        [matchId]: {
+          ...(prev[matchId] ?? { user_id: selectedUserId, match_id: matchId, bolao_id: bolaoId }),
+          home_score: parseInt(edit.home),
+          away_score: parseInt(edit.away),
+          points,
+        } as Prediction,
+      }))
+      setPredSaved((s) => ({ ...s, [matchId]: true }))
+      setTimeout(() => setPredSaved((s) => ({ ...s, [matchId]: false })), 2000)
     } else {
       const data = await res.json()
-      setPredError((e) => ({ ...e, [predId]: data.error ?? 'Erro ao salvar' }))
+      setPredError((e) => ({ ...e, [matchId]: data.error ?? 'Erro ao salvar' }))
     }
   }
 
@@ -217,74 +227,71 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
         )}
 
         {selectedUserId && !loadingPreds && (
-          <div className="space-y-2">
-            {userPredictions.length === 0 ? (
-              <div className="text-sm text-gray-400 text-center py-4">Nenhum palpite encontrado.</div>
-            ) : (
-              userPredictions
-                .slice()
-                .sort((a, b) => {
-                  const ma = matchMap[a.match_id]
-                  const mb = matchMap[b.match_id]
-                  return new Date(ma?.match_date ?? 0).getTime() - new Date(mb?.match_date ?? 0).getTime()
-                })
-                .map((pred) => {
-                  const match = matchMap[pred.match_id]
-                  const edit = predEdits[pred.id]
-                  if (!match || !edit) return null
-                  return (
-                    <div key={pred.id} className="bg-white border rounded-xl p-3 flex flex-wrap items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-800 truncate">
-                          {match.home_team} vs {match.away_team}
-                        </div>
-                        <div className="text-xs text-gray-400 flex items-center gap-1.5">
-                          {new Date(match.match_date).toLocaleDateString('pt-BR', {
-                            day: '2-digit', month: 'short',
-                          })}
-                          {pred.points !== null && (
-                            <Badge variant="secondary" className="text-xs">{pred.points} pts</Badge>
-                          )}
-                          {match.status === 'FINISHED' && match.home_score !== null && (
-                            <span className="text-gray-400">
-                              (resultado: {match.home_score}:{match.away_score})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Input
-                          type="number" min={0} max={99}
-                          value={edit.home}
-                          onChange={(e) => setPredEdits((s) => ({ ...s, [pred.id]: { ...s[pred.id], home: e.target.value } }))}
-                          className="w-10 text-center p-1 text-sm"
-                        />
-                        <span className="text-gray-400 font-bold text-sm">:</span>
-                        <Input
-                          type="number" min={0} max={99}
-                          value={edit.away}
-                          onChange={(e) => setPredEdits((s) => ({ ...s, [pred.id]: { ...s[pred.id], away: e.target.value } }))}
-                          className="w-10 text-center p-1 text-sm"
-                        />
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={predSaving[pred.id] || edit.home === '' || edit.away === ''}
-                        onClick={() => savePrediction(pred.id)}
-                        className="text-xs"
-                      >
-                        {predSaved[pred.id] ? (
-                          <><CheckCircle2 className="w-3 h-3 mr-1 text-green-600" />Salvo</>
-                        ) : predSaving[pred.id] ? 'Salvando...' : 'Salvar'}
-                      </Button>
-                      {predError[pred.id] && (
-                        <span className="text-xs text-red-500 w-full">{predError[pred.id]}</span>
+          <div className="space-y-6">
+            {matches.map((match) => {
+              const existing = predByMatch[match.id]
+              const edit = predEdits[match.id]
+              if (!edit) return null
+              const hasPred = existing !== undefined
+
+              return (
+                <div
+                  key={match.id}
+                  className={`bg-white border rounded-xl p-3 flex flex-wrap items-center gap-3 ${!hasPred ? 'border-dashed border-orange-200' : ''}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-800 truncate">
+                      {match.home_team} vs {match.away_team}
+                    </div>
+                    <div className="text-xs text-gray-400 flex items-center gap-1.5">
+                      {new Date(match.match_date).toLocaleDateString('pt-BR', {
+                        day: '2-digit', month: 'short',
+                      })}
+                      {!hasPred && (
+                        <span className="text-orange-500 font-medium">sem palpite</span>
+                      )}
+                      {existing?.points !== null && existing?.points !== undefined && (
+                        <Badge variant="secondary" className="text-xs">{existing.points} pts</Badge>
+                      )}
+                      {match.status === 'FINISHED' && match.home_score !== null && (
+                        <span>(resultado: {match.home_score}:{match.away_score})</span>
                       )}
                     </div>
-                  )
-                })
-            )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number" min={0} max={99}
+                      value={edit.home}
+                      onChange={(e) => setPredEdits((s) => ({ ...s, [match.id]: { ...s[match.id], home: e.target.value } }))}
+                      className="w-10 text-center p-1 text-sm"
+                      placeholder="?"
+                    />
+                    <span className="text-gray-400 font-bold text-sm">:</span>
+                    <Input
+                      type="number" min={0} max={99}
+                      value={edit.away}
+                      onChange={(e) => setPredEdits((s) => ({ ...s, [match.id]: { ...s[match.id], away: e.target.value } }))}
+                      className="w-10 text-center p-1 text-sm"
+                      placeholder="?"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={hasPred ? 'outline' : 'default'}
+                    disabled={predSaving[match.id] || edit.home === '' || edit.away === ''}
+                    onClick={() => savePrediction(match.id)}
+                    className={`text-xs ${!hasPred ? 'bg-orange-500 hover:bg-orange-600 border-orange-500' : ''}`}
+                  >
+                    {predSaved[match.id] ? (
+                      <><CheckCircle2 className="w-3 h-3 mr-1 text-green-600" />Salvo</>
+                    ) : predSaving[match.id] ? 'Salvando...' : hasPred ? 'Salvar' : 'Adicionar'}
+                  </Button>
+                  {predError[match.id] && (
+                    <span className="text-xs text-red-500 w-full">{predError[match.id]}</span>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
