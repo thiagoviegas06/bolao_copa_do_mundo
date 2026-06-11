@@ -2,18 +2,18 @@ import { WorldCupGroup } from '@/types/database'
 
 // Copa do Mundo 2026 — 48 times, 12 grupos de 4
 export const COPA_2026_GROUPS: WorldCupGroup[] = [
-  { name: 'A', teams: ['México', 'EUA', 'Canadá', 'Jamaica'] },
-  { name: 'B', teams: ['Brasil', 'Colômbia', 'Equador', 'Bolívia'] },
-  { name: 'C', teams: ['Argentina', 'Uruguai', 'Chile', 'Peru'] },
-  { name: 'D', teams: ['França', 'Bélgica', 'Holanda', 'Dinamarca'] },
-  { name: 'E', teams: ['Espanha', 'Portugal', 'Croácia', 'Albânia'] },
-  { name: 'F', teams: ['Alemanha', 'Inglaterra', 'Áustria', 'Suíça'] },
-  { name: 'G', teams: ['Marrocos', 'Senegal', 'Camarões', 'Costa do Marfim'] },
-  { name: 'H', teams: ['Japão', 'Coreia do Sul', 'Austrália', 'Arábia Saudita'] },
-  { name: 'I', teams: ['Polônia', 'República Tcheca', 'Romênia', 'Eslováquia'] },
-  { name: 'J', teams: ['Turquia', 'Grécia', 'Sérvia', 'Eslovênia'] },
-  { name: 'K', teams: ['Irã', 'Iraque', 'Qatar', 'Jordânia'] },
-  { name: 'L', teams: ['Costa Rica', 'Panamá', 'Honduras', 'El Salvador'] },
+  { name: 'A', teams: ['Mexico', 'South Africa', 'South Korea', 'Czechia'] },
+  { name: 'B', teams: ['Canada', 'Bosnia and Herzegovina', 'Qatar', 'Switzerland'] },
+  { name: 'C', teams: ['Brazil', 'Morocco', 'Haiti', 'Scotland'] },
+  { name: 'D', teams: ['United States', 'Paraguay', 'Australia', 'Türkiye'] },
+  { name: 'E', teams: ['Germany', 'Curaçao', 'Ivory Coast', 'Ecuador'] },
+  { name: 'F', teams: ['Netherlands', 'Japan', 'Sweden', 'Tunisia'] },
+  { name: 'G', teams: ['Belgium', 'Egypt', 'Iran', 'New Zealand'] },
+  { name: 'H', teams: ['Spain', 'Cabo Verde', 'Saudi Arabia', 'Uruguay'] },
+  { name: 'I', teams: ['France', 'Senegal', 'Iraq', 'Norway'] },
+  { name: 'J', teams: ['Argentina', 'Algeria', 'Austria', 'Jordan'] },
+  { name: 'K', teams: ['Portugal', 'DR Congo', 'Uzbekistan', 'Colombia'] },
+  { name: 'L', teams: ['England', 'Croatia', 'Ghana', 'Panama'] },
 ]
 
 export const ALL_TEAMS = COPA_2026_GROUPS.flatMap((g) => g.teams).sort()
