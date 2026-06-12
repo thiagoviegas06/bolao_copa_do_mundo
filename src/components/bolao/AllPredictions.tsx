@@ -1,14 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Prediction, Match, RankingEntry, TournamentPrediction } from '@/types/database'
+import { Prediction, Match, MatchWithPrediction, RankingEntry, TournamentPrediction } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
 import { Clock, Trophy, Zap, Lock } from 'lucide-react'
 
 interface Props {
   allPredictions: Prediction[]
   allTournamentPredictions: TournamentPrediction[]
-  matches: Match[]
+  matches: MatchWithPrediction[]
   ranking: RankingEntry[]
   currentUserId: string
   tournamentLocked: boolean
@@ -33,8 +33,8 @@ function dateKey(match_date: string) {
   })
 }
 
-function groupByDate(matches: Match[]) {
-  const groups: Record<string, Match[]> = {}
+function groupByDate(matches: MatchWithPrediction[]) {
+  const groups: Record<string, MatchWithPrediction[]> = {}
   matches.forEach((m) => {
     const key = dateKey(m.match_date)
     if (!groups[key]) groups[key] = []
@@ -160,9 +160,13 @@ export default function AllPredictions({
             </h3>
             <div className="space-y-2">
               {dayMatches.map((match) => {
-                const pred = predMap.get(match.id)
                 const locked = matchLockTime(match.match_date) <= now
                 const canSeePred = isOwnProfile || locked
+                // Own profile: use match.prediction (embedded server-side, always fresh)
+                // Other users: use allPredictions, only after lock
+                const pred = isOwnProfile
+                  ? (match.prediction ?? undefined)
+                  : canSeePred ? predMap.get(match.id) : undefined
                 const hasResult = match.status === 'FINISHED' && match.home_score !== null
 
                 let pointsBadge = null
