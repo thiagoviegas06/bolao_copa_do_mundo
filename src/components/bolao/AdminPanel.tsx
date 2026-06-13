@@ -5,7 +5,7 @@ import { Match, RankingEntry, Prediction } from '@/types/database'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, Settings, Users } from 'lucide-react'
+import { CheckCircle2, Settings, Users, RefreshCw } from 'lucide-react'
 
 interface Props {
   matches: Match[]
@@ -39,6 +39,9 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
   const [matchSaved, setMatchSaved] = useState<Record<string, boolean>>({})
   const [matchError, setMatchError] = useState<Record<string, string>>({})
 
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
+
   const [selectedUserId, setSelectedUserId] = useState('')
   const [predByMatch, setPredByMatch] = useState<Record<string, Prediction>>({})
   const [loadingPreds, setLoadingPreds] = useState(false)
@@ -48,6 +51,16 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
   const [predError, setPredError] = useState<Record<string, string>>({})
 
   const matchMap = Object.fromEntries(matches.map((m) => [m.id, m]))
+
+  async function triggerSync() {
+    setSyncing(true)
+    setSyncMsg('')
+    const res = await fetch('/api/admin/sync', { method: 'POST' })
+    const data = await res.json()
+    setSyncing(false)
+    setSyncMsg(res.ok ? `✓ ${data.synced} jogos atualizados` : `Erro: ${data.error}`)
+    setTimeout(() => setSyncMsg(''), 5000)
+  }
 
   async function saveMatchResult(matchId: string) {
     const edit = matchEdits[matchId]
@@ -136,6 +149,21 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
 
   return (
     <div className="space-y-10">
+      {/* Sync */}
+      <div className="flex items-center gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={syncing}
+          onClick={triggerSync}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing ? 'Sincronizando...' : 'Sincronizar resultados agora'}
+        </Button>
+        {syncMsg && <span className="text-sm text-gray-600">{syncMsg}</span>}
+      </div>
+
       {/* Match Results */}
       <div>
         <h2 className="text-sm font-bold text-gray-600 uppercase tracking-wide mb-4 flex items-center gap-2">
