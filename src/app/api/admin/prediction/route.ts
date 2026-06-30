@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { recalcTotalPoints } from '@/lib/scoring'
 
 function calcPoints(
   predHome: number, predAway: number,
@@ -63,17 +64,7 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Recalculate total_points for this user in this bolão
-  const { data: allPreds } = await admin.from('predictions')
-    .select('points')
-    .eq('bolao_id', bolaoId)
-    .eq('user_id', userId)
-
-  const total = (allPreds ?? []).reduce((sum, p) => sum + (p.points ?? 0), 0)
-  await admin.from('bolao_members')
-    .update({ total_points: total })
-    .eq('bolao_id', bolaoId)
-    .eq('user_id', userId)
+  await recalcTotalPoints(admin, bolaoId, userId)
 
   return NextResponse.json({ ok: true, points })
 }

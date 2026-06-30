@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Match, RankingEntry, Prediction } from '@/types/database'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, Settings, Users, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Settings, Users, RefreshCw, Trophy } from 'lucide-react'
 
 interface Props {
   matches: Match[]
@@ -41,6 +41,14 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
 
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
+  const [lastSync, setLastSync] = useState<string | null>(null)
+
+  const [scoringGroups, setScoringGroups] = useState(false)
+  const [scoreGroupsMsg, setScoreGroupsMsg] = useState('')
+
+  useEffect(() => {
+    setLastSync(localStorage.getItem('lastMatchSync'))
+  }, [])
 
   const [selectedUserId, setSelectedUserId] = useState('')
   const [predByMatch, setPredByMatch] = useState<Record<string, Prediction>>({})
@@ -59,7 +67,33 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
     const data = await res.json()
     setSyncing(false)
     setSyncMsg(res.ok ? `✓ ${data.synced} jogos atualizados` : `Erro: ${data.error}`)
+    if (res.ok) {
+      const now = new Date().toISOString()
+      localStorage.setItem('lastMatchSync', now)
+      setLastSync(now)
+    }
     setTimeout(() => setSyncMsg(''), 5000)
+  }
+
+  async function scoreGroupWinners() {
+    setScoringGroups(true)
+    setScoreGroupsMsg('')
+    const res = await fetch('/api/admin/score-groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bolaoId }),
+    })
+    const data = await res.json()
+    setScoringGroups(false)
+    if (res.ok) {
+      const groups = Object.entries(data.groupWinners as Record<string, string>)
+        .map(([g, t]) => `${g}: ${t}`)
+        .join(', ')
+      setScoreGroupsMsg(`✓ ${data.scoredCount} acertos de ${data.total} palpites · ${groups}`)
+    } else {
+      setScoreGroupsMsg(`Erro: ${data.error}`)
+    }
+    setTimeout(() => setScoreGroupsMsg(''), 10000)
   }
 
   async function saveMatchResult(matchId: string) {
@@ -161,7 +195,34 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
           <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
           {syncing ? 'Sincronizando...' : 'Sincronizar resultados agora'}
         </Button>
-        {syncMsg && <span className="text-sm text-gray-600">{syncMsg}</span>}
+        {syncMsg ? (
+          <span className="text-sm text-gray-600">{syncMsg}</span>
+        ) : lastSync ? (
+          <span className="text-sm text-gray-400">
+            Última sincronização: {new Date(lastSync).toLocaleString('pt-BR', {
+              day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+            })}
+          </span>
+        ) : null}
+      </div>
+
+      {/* Score Group Winners */}
+      <div className="flex items-center gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={scoringGroups}
+          onClick={scoreGroupWinners}
+          className="flex items-center gap-2"
+        >
+          <Trophy className={`w-4 h-4 ${scoringGroups ? 'animate-pulse' : ''}`} />
+          {scoringGroups ? 'Pontuando grupos...' : 'Pontuar líderes de grupos'}
+        </Button>
+        {scoreGroupsMsg && (
+          <span className={`text-sm ${scoreGroupsMsg.startsWith('Erro') ? 'text-red-500' : 'text-gray-600'}`}>
+            {scoreGroupsMsg}
+          </span>
+        )}
       </div>
 
       {/* Match Results */}
