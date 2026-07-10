@@ -56,6 +56,7 @@ create table public.matches (
   home_score integer,
   away_score integer,
   status text default 'SCHEDULED' check (status in ('SCHEDULED', 'LIVE', 'FINISHED', 'POSTPONED')) not null,
+  locked boolean default false not null, -- true = editado manualmente pelo admin, sync não sobrescreve time/data/fase
   created_at timestamptz default now() not null
 );
 

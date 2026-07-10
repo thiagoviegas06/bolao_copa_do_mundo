@@ -112,6 +112,7 @@ export type Database = {
           home_score: number | null
           away_score: number | null
           status: string
+          locked: boolean
           created_at: string
         }
         Insert: {
@@ -126,6 +127,7 @@ export type Database = {
           home_score?: number | null
           away_score?: number | null
           status?: string
+          locked?: boolean
           created_at?: string
         }
         Update: {
@@ -140,6 +142,7 @@ export type Database = {
           home_score?: number | null
           away_score?: number | null
           status?: string
+          locked?: boolean
           created_at?: string
         }
         Relationships: []

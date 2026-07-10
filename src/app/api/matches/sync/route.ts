@@ -73,25 +73,55 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const upsertData = matches.map((m) => ({
-    external_id: m.id,
-    home_team: m.homeTeam.shortName || m.homeTeam.name || 'A definir',
-    away_team: m.awayTeam.shortName || m.awayTeam.name || 'A definir',
-    home_team_flag: flagEmoji(m.homeTeam.crest),
-    away_team_flag: flagEmoji(m.awayTeam.crest),
-    match_date: m.utcDate,
-    stage: m.stage,
-    home_score: m.score.fullTime.home,
-    away_score: m.score.fullTime.away,
-    status: mapStatus(m.status),
-  }))
-
-  const { error } = await supabase
+  // Partidas editadas manualmente pelo admin (locked) mantêm time/data/fase
+  // mesmo que a API retorne dados diferentes — só o placar/status é sincronizado.
+  // Partidas já FINISHED no banco não são mais tocadas — a API às vezes manda
+  // resultado errado pra jogos antigos, então o resultado final fica travado.
+  const { data: existing } = await supabase
     .from('matches')
-    .upsert(upsertData, { onConflict: 'external_id' })
+    .select('external_id, home_team, away_team, home_team_flag, away_team_flag, match_date, stage, locked, status')
+  const existingByExternalId = new Map((existing ?? []).map((m) => [m.external_id, m]))
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  const upsertData = matches
+    .filter((m) => existingByExternalId.get(m.id)?.status !== 'FINISHED')
+    .map((m) => {
+      const prev = existingByExternalId.get(m.id)
+      if (prev?.locked) {
+        return {
+          external_id: m.id,
+          home_team: prev.home_team,
+          away_team: prev.away_team,
+          home_team_flag: prev.home_team_flag,
+          away_team_flag: prev.away_team_flag,
+          match_date: prev.match_date,
+          stage: prev.stage,
+          home_score: m.score.fullTime.home,
+          away_score: m.score.fullTime.away,
+          status: mapStatus(m.status),
+        }
+      }
+      return {
+        external_id: m.id,
+        home_team: m.homeTeam.shortName || m.homeTeam.name || 'A definir',
+        away_team: m.awayTeam.shortName || m.awayTeam.name || 'A definir',
+        home_team_flag: flagEmoji(m.homeTeam.crest),
+        away_team_flag: flagEmoji(m.awayTeam.crest),
+        match_date: m.utcDate,
+        stage: m.stage,
+        home_score: m.score.fullTime.home,
+        away_score: m.score.fullTime.away,
+        status: mapStatus(m.status),
+      }
+    })
+
+  if (upsertData.length > 0) {
+    const { error } = await supabase
+      .from('matches')
+      .upsert(upsertData, { onConflict: 'external_id' })
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ synced: upsertData.length })

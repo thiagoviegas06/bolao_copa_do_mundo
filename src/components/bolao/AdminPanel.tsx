@@ -5,7 +5,7 @@ import { Match, RankingEntry, Prediction } from '@/types/database'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, Settings, Users, RefreshCw, Trophy } from 'lucide-react'
+import { CheckCircle2, Settings, Users, RefreshCw, Trophy, Pencil, Lock, Unlock } from 'lucide-react'
 
 interface Props {
   matches: Match[]
@@ -26,6 +26,13 @@ const STATUS_OPTIONS = ['SCHEDULED', 'LIVE', 'FINISHED', 'POSTPONED']
 
 type MatchEdit = { home: string; away: string; status: string }
 type PredEdit = { home: string; away: string }
+type DetailEdit = { homeTeam: string; awayTeam: string; matchDate: string; stage: string }
+
+function toLocalInput(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
   const [matchEdits, setMatchEdits] = useState<Record<string, MatchEdit>>(
@@ -38,6 +45,22 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
   const [matchSaving, setMatchSaving] = useState<Record<string, boolean>>({})
   const [matchSaved, setMatchSaved] = useState<Record<string, boolean>>({})
   const [matchError, setMatchError] = useState<Record<string, string>>({})
+
+  const [detailOpen, setDetailOpen] = useState<Record<string, boolean>>({})
+  const [detailEdits, setDetailEdits] = useState<Record<string, DetailEdit>>(
+    Object.fromEntries(matches.map((m) => [m.id, {
+      homeTeam: m.home_team,
+      awayTeam: m.away_team,
+      matchDate: toLocalInput(m.match_date),
+      stage: m.stage,
+    }]))
+  )
+  const [detailLocked, setDetailLocked] = useState<Record<string, boolean>>(
+    Object.fromEntries(matches.map((m) => [m.id, m.locked]))
+  )
+  const [detailSaving, setDetailSaving] = useState<Record<string, boolean>>({})
+  const [detailSaved, setDetailSaved] = useState<Record<string, boolean>>({})
+  const [detailError, setDetailError] = useState<Record<string, string>>({})
 
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
@@ -120,6 +143,36 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
     } else {
       const data = await res.json()
       setMatchError((e) => ({ ...e, [matchId]: data.error ?? 'Erro ao salvar' }))
+    }
+  }
+
+  async function saveMatchDetails(matchId: string, locked: boolean) {
+    const edit = detailEdits[matchId]
+    setDetailSaving((s) => ({ ...s, [matchId]: true }))
+    setDetailError((e) => ({ ...e, [matchId]: '' }))
+
+    const res = await fetch('/api/admin/match-edit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchId,
+        bolaoId,
+        homeTeam: edit.homeTeam,
+        awayTeam: edit.awayTeam,
+        matchDate: new Date(edit.matchDate).toISOString(),
+        stage: edit.stage,
+        locked,
+      }),
+    })
+
+    setDetailSaving((s) => ({ ...s, [matchId]: false }))
+    if (res.ok) {
+      setDetailLocked((s) => ({ ...s, [matchId]: locked }))
+      setDetailSaved((s) => ({ ...s, [matchId]: true }))
+      setTimeout(() => setDetailSaved((s) => ({ ...s, [matchId]: false })), 2000)
+    } else {
+      const data = await res.json()
+      setDetailError((e) => ({ ...e, [matchId]: data.error ?? 'Erro ao salvar' }))
     }
   }
 
@@ -234,57 +287,135 @@ export default function AdminPanel({ matches, ranking, bolaoId }: Props) {
         <div className="space-y-2">
           {matches.map((m) => {
             const edit = matchEdits[m.id]
+            const detail = detailEdits[m.id]
+            const isLocked = detailLocked[m.id]
+            const isOpen = detailOpen[m.id]
             return (
-              <div key={m.id} className="bg-white border rounded-xl p-3 flex flex-wrap items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-800 truncate">
-                    {m.home_team} vs {m.away_team}
+              <div key={m.id} className="bg-white border rounded-xl p-3 flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-800 truncate flex items-center gap-1.5">
+                      {m.home_team} vs {m.away_team}
+                      {isLocked && (
+                        <Lock className="w-3 h-3 text-orange-500 shrink-0" aria-label="Editado manualmente" />
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {new Date(m.match_date).toLocaleDateString('pt-BR', {
+                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                      })} · {STAGE_LABELS[m.stage] ?? m.stage}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-400">
-                    {new Date(m.match_date).toLocaleDateString('pt-BR', {
-                      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-                    })} · {STAGE_LABELS[m.stage] ?? m.stage}
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number" min={0} max={99}
+                      value={edit.home}
+                      onChange={(e) => setMatchEdits((s) => ({ ...s, [m.id]: { ...s[m.id], home: e.target.value } }))}
+                      className="w-10 text-center p-1 text-sm"
+                      placeholder="?"
+                    />
+                    <span className="text-gray-400 font-bold text-sm">:</span>
+                    <Input
+                      type="number" min={0} max={99}
+                      value={edit.away}
+                      onChange={(e) => setMatchEdits((s) => ({ ...s, [m.id]: { ...s[m.id], away: e.target.value } }))}
+                      className="w-10 text-center p-1 text-sm"
+                      placeholder="?"
+                    />
                   </div>
+                  <select
+                    value={edit.status}
+                    onChange={(e) => setMatchEdits((s) => ({ ...s, [m.id]: { ...s[m.id], status: e.target.value } }))}
+                    className="text-xs border rounded-lg px-2 py-1.5 bg-white text-gray-700"
+                  >
+                    {STATUS_OPTIONS.map((st) => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={matchSaving[m.id]}
+                    onClick={() => saveMatchResult(m.id)}
+                    className="text-xs"
+                  >
+                    {matchSaved[m.id] ? (
+                      <><CheckCircle2 className="w-3 h-3 mr-1 text-green-600" />Salvo</>
+                    ) : matchSaving[m.id] ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setDetailOpen((s) => ({ ...s, [m.id]: !s[m.id] }))}
+                    className="text-xs"
+                  >
+                    <Pencil className="w-3 h-3 mr-1" />
+                    {isOpen ? 'Fechar' : 'Editar jogo'}
+                  </Button>
+                  {matchError[m.id] && (
+                    <span className="text-xs text-red-500 w-full">{matchError[m.id]}</span>
+                  )}
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    type="number" min={0} max={99}
-                    value={edit.home}
-                    onChange={(e) => setMatchEdits((s) => ({ ...s, [m.id]: { ...s[m.id], home: e.target.value } }))}
-                    className="w-10 text-center p-1 text-sm"
-                    placeholder="?"
-                  />
-                  <span className="text-gray-400 font-bold text-sm">:</span>
-                  <Input
-                    type="number" min={0} max={99}
-                    value={edit.away}
-                    onChange={(e) => setMatchEdits((s) => ({ ...s, [m.id]: { ...s[m.id], away: e.target.value } }))}
-                    className="w-10 text-center p-1 text-sm"
-                    placeholder="?"
-                  />
-                </div>
-                <select
-                  value={edit.status}
-                  onChange={(e) => setMatchEdits((s) => ({ ...s, [m.id]: { ...s[m.id], status: e.target.value } }))}
-                  className="text-xs border rounded-lg px-2 py-1.5 bg-white text-gray-700"
-                >
-                  {STATUS_OPTIONS.map((st) => (
-                    <option key={st} value={st}>{st}</option>
-                  ))}
-                </select>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={matchSaving[m.id]}
-                  onClick={() => saveMatchResult(m.id)}
-                  className="text-xs"
-                >
-                  {matchSaved[m.id] ? (
-                    <><CheckCircle2 className="w-3 h-3 mr-1 text-green-600" />Salvo</>
-                  ) : matchSaving[m.id] ? 'Salvando...' : 'Salvar'}
-                </Button>
-                {matchError[m.id] && (
-                  <span className="text-xs text-red-500 w-full">{matchError[m.id]}</span>
+
+                {isOpen && (
+                  <div className="flex flex-wrap items-center gap-2 pt-3 border-t">
+                    <Input
+                      type="text"
+                      value={detail.homeTeam}
+                      onChange={(e) => setDetailEdits((s) => ({ ...s, [m.id]: { ...s[m.id], homeTeam: e.target.value } }))}
+                      className="w-32 text-sm"
+                      placeholder="Time da casa"
+                    />
+                    <span className="text-gray-400 text-sm">vs</span>
+                    <Input
+                      type="text"
+                      value={detail.awayTeam}
+                      onChange={(e) => setDetailEdits((s) => ({ ...s, [m.id]: { ...s[m.id], awayTeam: e.target.value } }))}
+                      className="w-32 text-sm"
+                      placeholder="Time visitante"
+                    />
+                    <Input
+                      type="datetime-local"
+                      value={detail.matchDate}
+                      onChange={(e) => setDetailEdits((s) => ({ ...s, [m.id]: { ...s[m.id], matchDate: e.target.value } }))}
+                      className="text-sm w-auto"
+                    />
+                    <select
+                      value={detail.stage}
+                      onChange={(e) => setDetailEdits((s) => ({ ...s, [m.id]: { ...s[m.id], stage: e.target.value } }))}
+                      className="text-xs border rounded-lg px-2 py-1.5 bg-white text-gray-700"
+                    >
+                      {Object.entries(STAGE_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={detailSaving[m.id]}
+                      onClick={() => saveMatchDetails(m.id, true)}
+                      className="text-xs"
+                    >
+                      {detailSaved[m.id] ? (
+                        <><CheckCircle2 className="w-3 h-3 mr-1 text-green-600" />Salvo</>
+                      ) : detailSaving[m.id] ? 'Salvando...' : 'Salvar dados do jogo'}
+                    </Button>
+                    {isLocked && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={detailSaving[m.id]}
+                        onClick={() => saveMatchDetails(m.id, false)}
+                        className="text-xs text-gray-500"
+                      >
+                        <Unlock className="w-3 h-3 mr-1" />
+                        Voltar a sincronizar automaticamente
+                      </Button>
+                    )}
+                    {detailError[m.id] && (
+                      <span className="text-xs text-red-500 w-full">{detailError[m.id]}</span>
+                    )}
+                  </div>
                 )}
               </div>
             )
